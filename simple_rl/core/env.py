@@ -39,7 +39,7 @@ class Env(ABC):
 class VecEnv:
 
     def __init__(self, makers):
-        assert len(makers) > 1
+        assert len(makers) > 0
         self.envs = [make() for make in makers] # listof Env instnaces
         self.num_envs = len(self.envs)
         self.obs_space = self.envs[0].obs_space

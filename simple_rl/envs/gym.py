@@ -26,5 +26,5 @@ class GymEnv(Env):
         return {"obs": states, "reward": 0.0, "is_first": True, "is_last": False, "is_terminal": False} 
 
     def step(self, action):
-        obs, reward, terminated, truncated, info = self.env.set(action)
+        obs, reward, terminated, truncated, info = self.env.step(action)
         return {"obs": obs, "reward": reward, "is_first": False, "is_last": terminated or truncated, "is_terminal": terminated} 
