@@ -1,0 +1,15 @@
+defaults:
+  - algo: ppo
+  - env: gym
+  - override hydra/job_logging: none
+  - _self_
+
+title: ???
+notes: ???
+seed: 0
+
+hydra:
+  run:
+    dir: results/logs/${title}_${now:%Y%m%d_%H%M%S}
+  job:
+    chdir: false
