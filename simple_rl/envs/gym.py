@@ -1,10 +1,7 @@
 # NoahRGB 11/2026
 #
 # wraps Gymnasium envs in a core/env.py Env object
-#
-#
-#
-#
+# (these can be used in a core/env.py VecEnv instance)
 #
 
 import gymnasium as gym

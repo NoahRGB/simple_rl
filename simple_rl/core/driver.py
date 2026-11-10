@@ -6,12 +6,19 @@
 # e.g. run an agent in an environment for 10 timesteps or 10 episodes
 #
 #
-#
 
 import numpy as np
 
+from simple_rl.core import logger as log
 
 
+def log_episode(episode, env_idx, quiet=False):
+
+    reward = episode["reward"].sum()
+    log.add("episode/avg_reward", reward, agg="mean")
+    log.add("episode/avg_length", len(episode["reward"]) - 1, agg="mean")
+    if not quiet:
+        print(f"episode completed, reward {reward}")
 
 class Driver:
 
@@ -24,6 +31,8 @@ class Driver:
 
         self.current_transition = None
         self.episodes = [[] for _ in range(env.num_envs)] # the transitions that make up each subenvs current episode 
+        self.total_steps = 0
+        self.total_episodes = 0
 
     def on_step(self, function):
         self.step_functions.append(function)
@@ -66,7 +75,10 @@ class Driver:
                     self.episodes[env_idx] = []
                     for func in self.episode_functions:
                         func(completed_episode, env_idx)
+
                     episodes_completed += 1
+                    self.total_episodes += 1
 
             steps_completed += self.env.num_envs
+            self.total_steps += self.env.num_envs
             self.current_transition = self.env.step(this_transition["action"])

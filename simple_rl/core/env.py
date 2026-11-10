@@ -1,7 +1,6 @@
 # NoahRGB 11/2026
 #
-#
-#
+# defines the classes/methods used by environments
 #
 #
 
@@ -37,6 +36,10 @@ class Env(ABC):
 
 
 class VecEnv:
+    # a class that allows multiple Env classes to be created and 
+    # handled appropriately
+    # 
+    # see Gymnasium SyncVectorEnv (https://gymnasium.farama.org/api/vector/sync_vector_env/)
 
     def __init__(self, makers):
         assert len(makers) > 0

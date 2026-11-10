@@ -13,6 +13,8 @@ from pathlib import Path
 import torch
 import numpy as np
 
+from simple_rl.core import logger as log
+
 
 @dataclass
 class Run:
@@ -46,6 +48,7 @@ def start(cfg, run_dir):
     )
 
     seed(cfg.seed)
+    log.setup([])
 
     train = importlib.import_module(f"simple_rl.algos.{cfg.algo.name}.train").train
     write_status(run_dir, status="running", started=now())
@@ -59,5 +62,7 @@ def start(cfg, run_dir):
     except Exception as e:
         write_status(run_dir, status="crashed", error=f"{type(e).__name__}: {e}", duration_s=round(time.time() - start_time))
         raise
+    finally:
+        log.close()
 
     write_status(run_dir, status="finished", duration_s=round(time.time() - start_time))
