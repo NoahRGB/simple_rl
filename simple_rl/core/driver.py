@@ -10,6 +10,7 @@
 import numpy as np
 
 from simple_rl.core import logger as log
+from simple_rl.core.timer import timer
 
 
 def log_episode(episode, env_idx, quiet=False):
@@ -50,8 +51,10 @@ class Driver:
         while steps_completed < steps or episodes_completed < episodes:
 
             this_transition = self.current_transition # (s, r, is_first, is_last, is_term)
-            # get an action from the agent given the current transition
-            agent_out = agent(this_transition)
+
+            with timer.section("policy"):
+                # get an action from the agent given the current transition
+                agent_out = agent(this_transition)
 
             # zero out actions for envs that have just terminated
             action = agent_out["action"].copy()
@@ -81,4 +84,6 @@ class Driver:
 
             steps_completed += self.env.num_envs
             self.total_steps += self.env.num_envs
-            self.current_transition = self.env.step(this_transition["action"])
+
+            with timer.section("env_step"):
+                self.current_transition = self.env.step(this_transition["action"])

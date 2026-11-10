@@ -21,13 +21,16 @@ class Logger:
         self.values = {}
         self.aggs = {}
 
-    def add(self, name, value=None, agg="mean"):
+    def add(self, name, value=None, agg="mean", prefix=None):
 
         # add a dict of values idividually
         if isinstance(name, dict):
             for key, val in name.items():
-                self.add(key, val, agg=agg)
+                self.add(key, val, agg=agg, prefix=prefix)
             return
+
+        if prefix:
+            name = f"{prefix}/{name}"
 
         # if value is a tensor then detach the graphh
         if hasattr(value, "detach"):
@@ -61,6 +64,7 @@ class TerminalOuptut:
     def __call__(self, step, metrics):
         for key, value in sorted(metrics.items()):
             print(f"[{step}] {key}: {round(value, 2)}")
+        print()
 
 class JSONOutput:
     def __init__(self, run_dir):
