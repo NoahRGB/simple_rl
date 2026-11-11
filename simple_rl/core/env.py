@@ -6,6 +6,7 @@
 
 from abc import ABC, abstractmethod
 import numpy as np
+import gymnasium as gym
 
 
 # transitions are stored as:
@@ -65,3 +66,14 @@ class VecEnv:
             self._needs_reset[env_idx] = transition["is_last"]
             transitions.append(transition)
         return {key: np.stack([transition[key] for transition in transitions]) for key in transitions[0]}
+
+
+def get_action_size(space):
+
+    if isinstance(space, gym.spaces.Discrete):
+        return space.n
+
+    if isinstance(space, gym.spaces.Box):
+        return space.shape[0] 
+
+    raise ValueError(f"unsupported action space {space}")

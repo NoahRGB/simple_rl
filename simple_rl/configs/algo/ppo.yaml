@@ -1,5 +1,23 @@
 name: ppo
 
 num_envs: 5
-steps: 1000
+lr: 0.001
+timesteps: 1_000_000
+rollout_len: 128
+epochs: 3
+batch_size: 128
+gamma: 0.99
+lam: 0.95
+epsilon: 0.1
+entropy_weight: 0.01
+value_weight: 1.0
+cgn: 0.5
 log_every: 100
+
+architecture:
+  actor_enc:
+    - {type: linear, out: 64, act: tanh}
+    - {type: linear, out: 64, act: tanh}
+  value_enc:
+    - {type: linear, out: 64, act: tanh}
+    - {type: linear, out: 64, act: tanh}
