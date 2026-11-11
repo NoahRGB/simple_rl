@@ -8,6 +8,9 @@ title: ???
 notes: ???
 seed: 0
 
+save_every: 50_000 # timesteps between checkpoints (always saves at the end of training)
+load_dir: null # directory of a previous run to load a checkpoint from
+
 hydra:
   run:
     dir: results/logs/${title}_${now:%Y%m%d_%H%M%S}

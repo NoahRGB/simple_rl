@@ -1,3 +1,10 @@
+# NoahRGB 11/2026
+#
+# contains the torch actor critic network used by the
+# ppo agent in algos/ppo/agent.py 
+#
+#
+
 
 import torch
 import gymnasium as gym

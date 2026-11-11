@@ -1,7 +1,7 @@
 # NoahRGB 11/2026
 #
-# the PPO agent. owns the network + optimiser and contains
-# all of the PPO maths (policy, GAE, clipped update)
+# the PPO agent. owns the network + optimiser and
+# update functionality 
 #
 #
 

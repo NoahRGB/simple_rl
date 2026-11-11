@@ -1,3 +1,9 @@
+# NoahRGB 11/2026
+#
+# the on policy rollout buffer used by the ppo agent
+# in algos/ppo/agent,.py
+#
+#
 
 import numpy as np
 import torch
@@ -14,6 +20,15 @@ class RolloutBuffer:
             self.state_dtype = torch.from_numpy(np.empty(0, dtype=state_dtype)).dtype 
         else:
             self.state_dtype = state_dtype
+
+        # allocated once. reset() only rewinds the timestep, since every slot gets overwritten
+        self.states_buffer = torch.empty((self.rollout_len, self.num_envs, *self.state_dim), dtype=self.state_dtype)
+        self.actions_buffer = torch.empty((self.rollout_len, self.num_envs, *self.action_dim), dtype=torch.float32)
+        self.rewards_buffer = torch.empty((self.rollout_len, self.num_envs), dtype=torch.float32)
+        self.next_states_buffer = torch.empty((self.rollout_len, self.num_envs, *self.state_dim), dtype=self.state_dtype)
+        self.is_terms_buffer = torch.empty((self.rollout_len, self.num_envs), dtype=torch.float32)
+        self.dones_buffer = torch.empty((self.rollout_len, self.num_envs), dtype=torch.float32)
+        self.logprobs_buffer = torch.empty((self.rollout_len, self.num_envs), dtype=torch.float32)
 
         self.reset()
 
