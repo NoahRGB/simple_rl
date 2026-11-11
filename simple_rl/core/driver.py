@@ -13,14 +13,6 @@ from simple_rl.core import logger as log
 from simple_rl.core.timer import timer
 
 
-def log_episode(episode, env_idx, quiet=False):
-
-    reward = episode["reward"].sum()
-    log.add("episode/avg_reward", reward, agg="mean")
-    log.add("episode/avg_length", len(episode["reward"]) - 1, agg="mean")
-    if not quiet:
-        print(f"episode completed, reward {reward}")
-
 class Driver:
 
     def __init__(self, env):
@@ -30,7 +22,7 @@ class Driver:
         self.step_functions = []
         self.episode_functions = []
 
-        self.current_transition = None
+        self.current_states = None
         self.episodes = [[] for _ in range(env.num_envs)] # the transitions that make up each subenvs current episode 
         self.total_steps = 0
         self.total_episodes = 0
@@ -41,49 +33,56 @@ class Driver:
     def on_episode(self, function):
         self.episode_functions.append(function)
 
+    def log_episode(self, episode, env_idx, quiet=False):
+        # an on_episode function: driver.on_episode(driver.log_episode)
+        reward = episode["reward"].sum()
+        log.add("episode/avg_reward", reward, agg="mean")
+        log.add("episode/avg_length", len(episode["reward"]), agg="mean")
+        if not quiet:
+            print(f"episode {self.total_episodes} completed, reward {reward}")
+
     def run(self, agent, steps=0, episodes=0):
-        if self.current_transition is None:
-            self.current_transition = self.env.reset()
+        if self.current_states is None:
+            self.current_states = self.env.reset()
 
         # loop until the step or episode limit has beeen met
         steps_completed = episodes_completed = 0
 
         while steps_completed < steps or episodes_completed < episodes:
 
-            this_transition = self.current_transition # (s, r, is_first, is_last, is_term)
-
             with timer.section("policy"):
                 # get an action from the agent given the current transition
-                agent_out = agent(this_transition)
+                agent_out = agent(self.current_states)
 
-            # zero out actions for envs that have just terminated
-            action = agent_out["action"].copy()
-            action[this_transition["is_last"]] = 0
-            agent_out["action"] = action
 
-            this_transition = {**this_transition, **agent_out}
+            with timer.section("env_step"):
+                # outcome is {next_state, reward, is_term, done}
+                # new_state is the true next_state, which may have been reset if the subenv finished
+                outcome, new_state = self.env.step(agent_out["action"])
+
+            transitions = {"state": self.current_states, **agent_out, **outcome}
+            self.current_states = new_state
 
             for env_idx in range(self.env.num_envs):
                 # individually call each on_step and on_episode for each subenv
-                env_transition = {key: value[env_idx] for key, value in this_transition.items()}
+                transition = {key: value[env_idx] for key, value in transitions.items()}
+
 
                 for func in self.step_functions:
-                    func(env_transition, env_idx)
+                    func(transition, env_idx)
 
-                self.episodes[env_idx].append(env_transition)
+                self.episodes[env_idx].append(transition)
 
-                if env_transition["is_last"]:
-                    completed_episode = {key: np.stack([transition[key] for transition in self.episodes[env_idx]]) for key in env_transition}
+                if transition["done"]:
+                    completed_episode = {key: np.stack([transition[key] for transition in self.episodes[env_idx]]) for key in transition}
 
                     self.episodes[env_idx] = []
-                    for func in self.episode_functions:
-                        func(completed_episode, env_idx)
-
+                    # count the episode first so that on_episode functions see its number (starting from 1)
                     episodes_completed += 1
                     self.total_episodes += 1
 
+                    for func in self.episode_functions:
+                        func(completed_episode, env_idx)
+
             steps_completed += self.env.num_envs
             self.total_steps += self.env.num_envs
-
-            with timer.section("env_step"):
-                self.current_transition = self.env.step(this_transition["action"])

@@ -18,10 +18,8 @@ class GymEnv(Env):
     def reset(self):
         states, info = self.env.reset(seed=self.seed)
         self.seed = None # only seed the first reset
-
-        # (s_t, r_t, is_first, is_last, is_terminal, a_t)
-        return {"obs": states, "reward": 0.0, "is_first": True, "is_last": False, "is_terminal": False} 
+        return states
 
     def step(self, action):
         obs, reward, terminated, truncated, info = self.env.step(action)
-        return {"obs": obs, "reward": reward, "is_first": False, "is_last": terminated or truncated, "is_terminal": terminated} 
+        return {"next_state": obs, "reward": reward, "done": terminated or truncated, "is_term": terminated} 
