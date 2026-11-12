@@ -1,7 +1,7 @@
 # NoahRGB 11/2026
 #
 # contains the world model, actor and critic classes
-# for the dreamerv1 agent
+# for the dreamerv2 agent
 #
 
 import torch
@@ -11,11 +11,15 @@ from simple_rl.algos.dreamer_v2.dist import TruncatedNormalDistribution
 
 
 class WorldModel(torch.nn.Module):
-    def __init__(self, state_dim: tuple, action_dim: int, latent_dim: int, hidden_dim: int, hidden_size: int):
+    def __init__(self, state_dim: tuple, action_dim: int, latent_vars: int, latent_classes: int, hidden_dim: int, hidden_size: int):
         super(WorldModel, self).__init__()
 
         self.hidden_dim = hidden_dim
-        self.latent_dim = latent_dim 
+
+        # the latent is latent_vars categorical variables with latent_classes classes each
+        self.latent_vars = latent_vars
+        self.latent_classes = latent_classes
+        self.latent_dim = self.latent_vars * self.latent_classes
 
         # the ENCODER part of the autoencoder
         self.encoder = torch.nn.Sequential(
@@ -38,8 +42,7 @@ class WorldModel(torch.nn.Module):
             torch.nn.Linear(embed_dim+self.hidden_dim, hidden_size),
             torch.nn.ELU(),
         )
-        self.posterior_mu_head = torch.nn.Linear(hidden_size, self.latent_dim)
-        self.posterior_sigma_head = torch.nn.Linear(hidden_size, self.latent_dim)
+        self.posterior_logits_head = torch.nn.Linear(hidden_size, self.latent_dim)
 
         # h_t = f(h_{t-1}, s_{t-1}, a_{t-1})
         self.rnn = torch.nn.GRUCell(self.latent_dim+action_dim, self.hidden_dim)
@@ -66,8 +69,7 @@ class WorldModel(torch.nn.Module):
             torch.nn.Linear(hidden_size, hidden_size),
             torch.nn.ELU(),
         )
-        self.prior_mu_head = torch.nn.Linear(hidden_size, self.latent_dim)
-        self.prior_sigma_head = torch.nn.Linear(hidden_size, self.latent_dim)
+        self.prior_logits_head = torch.nn.Linear(hidden_size, self.latent_dim)
 
         # the DECODER part of the autoencoder
         self.decoder = torch.nn.Sequential(
@@ -102,9 +104,10 @@ class Actor(torch.nn.Module):
     # given a latent, output an action
     # "the action model outputs a tanh-transformed Gaussian ... that allows for reparameterised sampling"
 
-    def __init__(self, latent_dim: int, hidden_dim: int, action_dim: int, is_discrete: bool, min_actor_stdev: float, hidden_size: int):
+    def __init__(self, latent_dim: int, hidden_dim: int, action_dim: int, is_discrete: bool, init_actor_std: float, min_actor_stdev: float, hidden_size: int):
         super(Actor, self).__init__()
 
+        self.init_actor_std = init_actor_std
         self.min_actor_stdev = min_actor_stdev
         self.is_discrete = is_discrete
 

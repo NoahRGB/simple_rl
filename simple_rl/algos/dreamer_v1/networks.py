@@ -100,9 +100,10 @@ class Actor(torch.nn.Module):
     # given a latent, output an action
     # "the action model outputs a tanh-transformed Gaussian ... that allows for reparameterised sampling"
 
-    def __init__(self, latent_dim: int, hidden_dim: int, action_dim: int, is_discrete: bool, min_actor_stdev: float, hidden_size: int):
+    def __init__(self, latent_dim: int, hidden_dim: int, action_dim: int, is_discrete: bool, init_stdev: float, min_actor_stdev: float, hidden_size: int):
         super(Actor, self).__init__()
 
+        self.init_stdev = init_stdev
         self.min_actor_stdev = min_actor_stdev
         self.is_discrete = is_discrete
 
@@ -130,7 +131,7 @@ class Actor(torch.nn.Module):
             std_out = self.std_head(network_out)
 
             mean = 5.0 * torch.tanh(mu_out / 5.0) 
-            std = torch.nn.functional.softplus(std_out) + self.min_actor_stdev
+            std = torch.nn.functional.softplus(std_out + self.init_stdev) + self.min_actor_stdev
 
             # the actor outputs a tanh transformed Gaussian
             # a TransformedDistribution with TanhTransform will automatically

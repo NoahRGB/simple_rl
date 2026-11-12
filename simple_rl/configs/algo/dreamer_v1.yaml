@@ -14,6 +14,7 @@ warmup_episodes: 50
 batch_size: 125 
 sequence_length: 20 
 recon_std: 1.0
+init_actor_std: 5.0
 min_actor_stdev: 1e-4
 imagination_horizon: 15
 lam: 0.95

@@ -60,6 +60,19 @@ class Logger:
         for output in self.outputs:
             output(step, {name: float(value)})
 
+    def figure(self, name, fig, step, prefix=None):
+        # writes a matplotlib figure immediately to every output that supports figures,
+        # then closes it so figures don't pile up in memory
+        import matplotlib.pyplot as plt
+
+        if prefix:
+            name = f"{prefix}/{name}"
+
+        for output in self.outputs:
+            if hasattr(output, "figure"):
+                output.figure(step, name, fig)
+        plt.close(fig)
+
     def close(self):
         # make sure any output methods are closed (e.g. files)
         for output in self.outputs:
@@ -75,7 +88,8 @@ class TerminalOutput:
 
 class JSONOutput:
     def __init__(self, run_dir):
-        self.file = open(Path(run_dir) / "metrics.jsonl", "a")
+        self.run_dir = Path(run_dir)
+        self.file = open(self.run_dir / "metrics.jsonl", "a")
 
     def __call__(self, step, metrics):
         self.file.write(json.dumps({"step": step, **metrics}) + "\n")
@@ -93,6 +107,10 @@ class TensorboardOutput:
         for key, value in sorted(metrics.items()):
             self.tb_writer.add_scalar(key, value, step)
 
+    def figure(self, step, name, fig):
+        # the logger closes the figure after all outputs have used it
+        self.tb_writer.add_figure(name, fig, step, close=False)
+
     def close(self):
         self.tb_writer.close()
 
@@ -105,4 +123,5 @@ setup = logger.setup
 add = logger.add
 write = logger.write
 write_now = logger.write_now
+figure = logger.figure
 close = logger.close

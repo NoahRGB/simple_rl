@@ -23,7 +23,7 @@ class DreamerV1Agent:
 
         self.is_discrete = is_discrete(action_space)
         self.world_model = WorldModel(obs_space.shape, self.action_size, cfg.latent_dim, cfg.rnn_size, cfg.hidden_layer_size).to(device)
-        self.actor = Actor(cfg.latent_dim, cfg.rnn_size, self.action_size, self.is_discrete, cfg.min_actor_stdev, cfg.hidden_layer_size).to(device)
+        self.actor = Actor(cfg.latent_dim, cfg.rnn_size, self.action_size, self.is_discrete, cfg.init_actor_std, cfg.min_actor_stdev, cfg.hidden_layer_size).to(device)
         self.value_model = ValueModel(cfg.latent_dim, cfg.rnn_size, cfg.hidden_layer_size).to(device)
 
         self.world_model_optim = torch.optim.Adam(self.world_model.parameters(), lr=cfg.world_model_lr)
@@ -78,7 +78,8 @@ class DreamerV1Agent:
                 else:
                     action = torch.argmax(action_dist.logits, dim=-1)
             else:
-                action = self._get_tanh_dist_mode(action_dist)
+                # action = self._get_tanh_dist_mode(action_dist)
+                action = action_dist.rsample()
                 action = (action + self.cfg.continuous_action_noise_stdev * torch.randn_like(action)).clamp(-1, 1)
 
 

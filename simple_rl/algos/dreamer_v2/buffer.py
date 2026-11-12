@@ -1,7 +1,7 @@
 # NoahRGB 11/2026
 #
 # contains the replay memory class used by the
-# dreamer v1 agent
+# dreamer v2 agent
 #
 #
 

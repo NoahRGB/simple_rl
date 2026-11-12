@@ -19,7 +19,6 @@ min_actor_stdev: 0.1
 imagination_horizon: 15
 lam: 0.95
 gamma: 0.99
-continuous_action_noise_stdev: 0.3
 cgn: 100.0
 
 world_model_lr: 0.0006

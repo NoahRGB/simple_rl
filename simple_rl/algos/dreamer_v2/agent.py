@@ -1,6 +1,6 @@
 # NoahRGB 11/2026
 #
-# contains the logic for the dreamer v1 agent
+# contains the logic for the dreamer v2 agent
 # gradient updates, policy, etc.
 #
 #
@@ -25,8 +25,8 @@ class DreamerV2Agent:
 
         self.latent_dim = cfg.latent_variables * cfg.latent_classes
 
-        self.world_model = WorldModel(obs_space.shape, self.action_size, self.latent_dim, cfg.rnn_size, cfg.hidden_layer_size).to(device)
-        self.actor = Actor(self.latent_dim, cfg.rnn_size, self.action_size, self.is_discrete, cfg.min_actor_stdev, cfg.hidden_layer_size).to(device)
+        self.world_model = WorldModel(obs_space.shape, self.action_size, cfg.latent_variables, cfg.latent_classes, cfg.rnn_size, cfg.hidden_layer_size).to(device)
+        self.actor = Actor(self.latent_dim, cfg.rnn_size, self.action_size, self.is_discrete, cfg.init_actor_std, cfg.min_actor_stdev, cfg.hidden_layer_size).to(device)
         self.value_model = ValueModel(self.latent_dim, cfg.rnn_size, cfg.hidden_layer_size).to(device)
         self.target_value_model = copy.deepcopy(self.value_model) 
         self.target_value_model.requires_grad_(False)
@@ -59,7 +59,7 @@ class DreamerV2Agent:
 
         if self.hidden_state is None:
             self.hidden_state = torch.zeros(num_envs, self.cfg.rnn_size, device=self.device)
-            self.latent = torch.zeros(num_envs, self.cfg.latent_dim, device=self.device)
+            self.latent = torch.zeros(num_envs, self.latent_dim, device=self.device)
             self.previous_action = torch.zeros(num_envs, self.action_size, device=self.device)
 
         with torch.no_grad():
@@ -71,7 +71,7 @@ class DreamerV2Agent:
 
             encoded = self.world_model.encoder(self._preprocess(states))
             self.hidden_state = self.world_model.rnn(torch.cat([self.latent, self.previous_action], dim=-1), self.hidden_state)
-            self.latent = self.world_model.posterior(torch.cat([self.hidden_state, encoded], dim=-1)).sample()
+            self.latent = self.world_model.posterior(torch.cat([self.hidden_state, encoded], dim=-1)).sample().flatten(-2)
 
             action_dist = self.actor(torch.cat([self.latent, self.hidden_state], dim=-1))
 
@@ -87,7 +87,7 @@ class DreamerV2Agent:
 
     def update(self, buffer):
         metric_names = ["world_model_loss", "reconstruction_loss", "reconstruction_mse", "kl", "kl_loss", "reward_loss",
-                        "prior_std", "posterior_std", "actor_loss", "value_model_loss", "discount_loss"]
+                        "actor_loss", "actor_entropy", "value_model_loss", "discount_loss"]
         metrics = {name: [] for name in metric_names}
 
         for update_step in range(self.cfg.gradient_updates):
@@ -101,7 +101,7 @@ class DreamerV2Agent:
             batch_states, batch_actions, batch_rewards, batch_next_states, batch_terms = windows # (B, L, ..., )
 
             batch_next_states = self._preprocess(batch_next_states)
-            if is_discrete:
+            if self.is_discrete:
                 batch_actions = torch.nn.functional.one_hot(batch_actions.long(), num_classes=self.action_size).float()
             else:
                 batch_actions = batch_actions.float()
@@ -247,12 +247,12 @@ class DreamerV2Agent:
                 metrics["world_model_loss"].append(world_model_loss.item())
                 metrics["reconstruction_loss"].append(recon_loss.item())
                 metrics["reconstruction_mse"].append(((recons.mean - batch_next_states.flatten(0, 1)) ** 2).mean().item())
-                metrics["kl"].append(kl.mean().item())
+                # kl is the raw KL(posterior || prior), before kl balancing and free nats are applied
+                metrics["kl"].append(posterior_kl.mean().item())
                 metrics["kl_loss"].append(kl_loss.item())
                 metrics["reward_loss"].append(reward_loss.item())
-                metrics["prior_std"].append(priors.stddev.mean().item())
-                metrics["posterior_std"].append(posteriors.stddev.mean().item())
                 metrics["actor_loss"].append(actor_loss.item())
+                metrics["actor_entropy"].append(action_entropy.mean().item())
                 metrics["value_model_loss"].append(value_model_loss.item())
                 metrics["discount_loss"].append(discount_loss.item())
 

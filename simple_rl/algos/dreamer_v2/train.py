@@ -1,6 +1,6 @@
 # NoahRGB 11/2026
 #
-# responsible for the training loop for the dreamer v1 agent
+# responsible for the training loop for the dreamer v2 agent
 #
 #
 

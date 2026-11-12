@@ -1,0 +1,6 @@
+type: gym
+id: "MyGridWorld"
+kwargs: {}
+
+wrappers:
+  channel_first:
