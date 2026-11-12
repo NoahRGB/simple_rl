@@ -10,9 +10,9 @@ save_checkpoints: true
 
 replay_size: 500_000
 prioritise_ends: true
-warmup_episodes: 5
-batch_size: 50 
-sequence_length: 50
+warmup_episodes: 50
+batch_size: 125 
+sequence_length: 20 
 recon_std: 1.0
 min_actor_stdev: 1e-4
 imagination_horizon: 15

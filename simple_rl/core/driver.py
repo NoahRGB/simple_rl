@@ -7,6 +7,7 @@
 #
 #
 
+from collections import deque
 import numpy as np
 
 from simple_rl.core import logger as log
@@ -28,6 +29,7 @@ class Driver:
         self.episodes = [[] for _ in range(env.num_envs)] # the transitions that make up each subenvs current episode 
         self.total_steps = 0
         self.total_episodes = 0
+        self.recent_rewards = deque(maxlen=100) # hold the last 100 rewards
 
     def on_step(self, function):
         self.step_functions.append(function)
@@ -41,9 +43,9 @@ class Driver:
     def log_episode(self, episode, env_idx, quiet=False):
         # an on_episode function: driver.on_episode(driver.log_episode)
         reward = episode["reward"].sum()
-        log.add("episode/avg_reward", reward, agg="mean")
-        log.add("episode/avg_length", len(episode["reward"]), agg="mean")
+        self.recent_rewards.append(reward)
         log.write_now("episode/reward", reward, self.total_steps)
+        log.write_now("episode/mean_reward_100", np.mean(self.recent_rewards), self.total_steps)
         if not quiet:
             print(f"episode {self.total_episodes} completed, timesteps {self.total_steps}, reward {reward}")
 

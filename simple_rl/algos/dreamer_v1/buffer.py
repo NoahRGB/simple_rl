@@ -33,6 +33,8 @@ class EpisodicReplayMemory:
 
             self.total_stored_timesteps += new_episode_length
             self.episodes.append((states, actions, rewards, next_states, term))
+        else:
+            print("skipping short episode in buffer")
 
     def sample(self, count, device, prioritise_ends=False):
         lengths = np.array([ep[0].shape[0] - self.window_size + 1 for ep in self.episodes])

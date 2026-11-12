@@ -1,7 +1,16 @@
 type: gym
 id: "ThrustEnv"
 
-kwargs: {}
+kwargs:
+  obs_type: "screen_pixels" # game_state
+  max_steps: 250 
+  num_scanners: 0 
+  game_level: 1 
+  aggro: 0
+  exploring_starts: False 
+  reverse_gravity: False 
+  display_scale: 1
+  action_space: "continuous"
 
 wrappers:
   resize: {shape: [64,64]}
