@@ -23,7 +23,7 @@ def train(cfg, run):
     driver = Driver(env)
 
     agent = DreamerV1Agent(cfg.algo, env.obs_space, env.action_space, run.device)
-    buffer = EpisodicReplayMemory(cfg.algo.replay_size, env.obs_space.shape, env.action_space.shape, env.obs_space.dtype)
+    buffer = EpisodicReplayMemory(cfg.algo.replay_size, env.obs_space.shape, env.action_space.shape, env.obs_space.dtype, cfg.algo.sequence_length)
 
     checkpoint = Checkpoint(
         run.dir, every=cfg.save_every,
@@ -41,6 +41,7 @@ def train(cfg, run):
     # execute S random warmup episodes to initialise dataset
     random_policy = lambda states, is_first: {"action": np.stack([env.action_space.sample() for _ in range(env.num_envs)])}
     driver.run(random_policy, episodes=cfg.algo.warmup_episodes)
+    timer.reset() # dont time the warmup
 
     last_log = driver.total_steps # the timestep of the last log.write()
 

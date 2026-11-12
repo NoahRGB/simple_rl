@@ -98,7 +98,7 @@ class DreamerV1Agent:
             # dynamics / world model updates
             # ================================
 
-            windows, sample_size = buffer.sample(self.cfg.batch_size, self.cfg.sequence_length, self.device)
+            windows, sample_size = buffer.sample(self.cfg.batch_size, self.cfg.sequence_length, self.device, self.cfg.prioritise_ends)
             batch_states, batch_actions, batch_rewards, batch_next_states, batch_terms = windows # (B, L, ..., )
 
             batch_next_states = self._preprocess(batch_next_states)

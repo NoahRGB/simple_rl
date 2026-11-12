@@ -1,44 +1,51 @@
-from noah_rl.algorithms.world_models.dreamer_v2 import WorldModel, Actor, preprocess, scale_action
+# NoahRGB 11/2026
+#
+#
+#
+#
+
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1])) # lets simple_rl be imported
+
 import torch
-from noah_rl.utils.gym import GymEnv
+import numpy as np
+import imageio
 from omegaconf import OmegaConf
-import  numpy as np
-import sys, imageio
-import gymnasium as gym
+
+from simple_rl.core.env import make_env
+from simple_rl.core.checkpoint import Checkpoint
+from simple_rl.algos.dreamer_v1.agent import DreamerV1Agent
+
 
 run_dir = sys.argv[1]
-device = "cpu"
+device = torch.device("cpu")
 seed = 1
 imagination_steps = 200
 
 cfg = OmegaConf.load(f"{run_dir}/.hydra/config.yaml")
 
-env = GymEnv(cfg.env_name, 1, seed=seed, wrappers=cfg.wrappers, **cfg.env_kwargs)
-is_discrete = isinstance(env.single_action_space, gym.spaces.Discrete)
-action_dim = env.single_action_space.n if is_discrete else env.single_action_space.shape[0]
+env = make_env(cfg.env, seed=seed, scale_actions=True)
+agent = DreamerV1Agent(cfg.algo, env.obs_space, env.action_space, device)
+world_model, actor = agent.world_model, agent.actor
 
-latent_dim = cfg.latent_variables * cfg.latent_classes
+Checkpoint(run_dir, world_model=world_model, actor=actor).load(run_dir)
 
-world_model = WorldModel(env.state_dim, action_dim, cfg.latent_variables, cfg.latent_classes, cfg.hidden_dim, cfg.hidden_layer_size).to(device)
-actor = Actor(latent_dim, cfg.hidden_dim, action_dim, is_discrete, cfg.min_actor_stdev, cfg.init_actor_std, cfg.hidden_layer_size).to(device)
-
-checkpoint = torch.load(f"{run_dir}/network.pt", map_location=device, weights_only=False)
-
-world_model.load_state_dict(checkpoint["world_model"])
-actor.load_state_dict(checkpoint["actor"])
-
-start_state, _ = env.reset()
+# add a batch dimension (1, *state_dim)
+start_state = np.stack([env.reset()])
 
 with torch.no_grad():
 
     # starts with a real env state turned into latent using posterior
     # then imagines using prior
-    imagination_latents = torch.zeros(1, latent_dim).to(device)
-    imagination_hidden_states = torch.zeros(1, cfg.hidden_dim).to(device)
-    previous_action = torch.zeros(1, action_dim).to(device)
+    imagination_latents = torch.zeros(1, cfg.algo.latent_dim).to(device)
+    imagination_hidden_states = torch.zeros(1, cfg.algo.rnn_size).to(device)
+    previous_action = torch.zeros(1, agent.action_size).to(device)
 
     imagination_hidden_states = world_model.rnn(torch.cat([imagination_latents, previous_action], dim=-1), imagination_hidden_states)
-    imagination_latents = world_model.posterior(torch.cat([imagination_hidden_states, world_model.encoder(preprocess(start_state, device))], dim=-1)).sample().flatten(-2)
+    imagination_latents = world_model.posterior(torch.cat([imagination_hidden_states, world_model.encoder(agent._preprocess(start_state))], dim=-1)).sample()
 
     decoded_observations = [world_model.decoder(torch.cat([imagination_latents, imagination_hidden_states], dim=-1))]
     for imagination_step in range(imagination_steps):
@@ -47,7 +54,7 @@ with torch.no_grad():
         actions = actor(torch.cat([imagination_latents, imagination_hidden_states], dim=-1)).rsample()
 
         imagination_hidden_states = world_model.rnn(torch.cat([imagination_latents, actions], dim=-1), imagination_hidden_states)
-        imagination_latents = world_model.prior(imagination_hidden_states).rsample().flatten(-2)
+        imagination_latents = world_model.prior(imagination_hidden_states).rsample()
 
         decoded_observations.append(world_model.decoder(torch.cat([imagination_latents, imagination_hidden_states], dim=-1)))
 
@@ -56,9 +63,10 @@ with torch.no_grad():
 frames = []
 for decoded in decoded_observations:
 
-    # undo the preprocessing / scaling on states 
+    # undo the preprocessing / scaling on states
     frame = (decoded[0].permute(1, 2, 0).numpy() + 0.5).clip(0, 1)
     frame = np.kron(frame, np.ones((4, 4, 1)))
     frames.append((frame * 255).astype(np.uint8))
 
 imageio.mimsave(f"{run_dir}/imagination.gif", frames, duration=1000/15, loop=0)
+print(f"saved {run_dir}/imagination.gif ({len(frames)} frames)")

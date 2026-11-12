@@ -43,6 +43,7 @@ class Driver:
         reward = episode["reward"].sum()
         log.add("episode/avg_reward", reward, agg="mean")
         log.add("episode/avg_length", len(episode["reward"]), agg="mean")
+        log.write_now("episode/reward", reward, self.total_steps)
         if not quiet:
             print(f"episode {self.total_episodes} completed, timesteps {self.total_steps}, reward {reward}")
 

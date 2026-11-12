@@ -1,7 +1,9 @@
 # NoahRGB 11/2026
 #
+# various wrappers / registry used by gym environments
+# in envs/gym.py
 #
-
+#
 
 import gymnasium as gym
 import numpy as np

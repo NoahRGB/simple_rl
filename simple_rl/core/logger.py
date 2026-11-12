@@ -40,6 +40,8 @@ class Logger:
         self.aggs[name] = agg
 
     def write(self, step):
+        # writes all logged values in self.values at the given step
+
         metrics = {}
 
         # aggregate all logged values
@@ -52,6 +54,11 @@ class Logger:
 
         self.values = {}
         self.aggs = {}
+
+    def write_now(self, name, value, step):
+        # writes a single value immediately without aggregating or waiting for write())
+        for output in self.outputs:
+            output(step, {name: float(value)})
 
     def close(self):
         # make sure any output methods are closed (e.g. files)
@@ -93,8 +100,9 @@ class TensorboardOutput:
 # create a global logger that is used everywhere
 logger = Logger()
 
-# shortcuts
+# shortcuts for importing
 setup = logger.setup
 add = logger.add
 write = logger.write
+write_now = logger.write_now
 close = logger.close

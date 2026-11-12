@@ -11,12 +11,23 @@ import shimmy
 
 from simple_rl.envs.wrappers import WRAPPERS
 from simple_rl.core.env import Env
+from simple_rl.envs.gridworld import GridWorld
 
 try:
     import minigrid
 except:
     print("minigrid not available")
 
+try:
+    gym.register(
+        id="ThrustEnv",
+        entry_point="src.thrust_gym.thrust_gymenv:ThrustEnv",
+    )
+except:
+    print("thrust not available")
+
+
+gym.register(id="MyGridWorld", entry_point=GridWorld)
 gym.register_envs(shimmy)
 
 class GymEnv(Env):

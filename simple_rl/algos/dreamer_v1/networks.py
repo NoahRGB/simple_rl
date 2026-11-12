@@ -28,8 +28,13 @@ class WorldModel(torch.nn.Module):
             torch.nn.Flatten(), # 1024
         )
 
+        # compute flattened encoder output size from the input shape
+        with torch.no_grad():
+            embed_dim = self.encoder(torch.zeros(1, *state_dim)).shape[-1]
+
+
         self.posterior_net = torch.nn.Sequential(
-            torch.nn.Linear(1024+self.hidden_dim, hidden_size),
+            torch.nn.Linear(embed_dim+self.hidden_dim, hidden_size),
             torch.nn.ELU(),
         )
         self.posterior_mu_head = torch.nn.Linear(hidden_size, self.latent_dim)

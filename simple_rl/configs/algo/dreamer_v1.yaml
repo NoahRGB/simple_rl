@@ -9,6 +9,7 @@ log_every: 500 # timesteps between log writes (metrics are averaged over each in
 save_checkpoints: true 
 
 replay_size: 500_000
+prioritise_ends: true
 warmup_episodes: 5
 batch_size: 50 
 sequence_length: 50

@@ -1,32 +1,46 @@
-from noah_rl.algorithms.world_models.dreamer_v2 import WorldModel, Actor, preprocess, scale_action
-import torch
-from noah_rl.utils.gym import GymEnv
-from omegaconf import OmegaConf
-import imageio, numpy as np
-import pygame
+# NoahRGB 11/2026
+#
+#
+#
+#
+
+
 import sys
-import gymnasium as gym
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1])) # lets simple_rl be imported
+
+import torch
+import numpy as np
+import pygame
+from omegaconf import OmegaConf
+
+from simple_rl.core.env import make_env
+from simple_rl.core.checkpoint import Checkpoint
+from simple_rl.algos.dreamer_v1.agent import DreamerV1Agent
 
 run_dir = sys.argv[1]
-device = "cpu"
-seed = None 
+device = torch.device("cpu")
+seed = None
 
 cfg = OmegaConf.load(f"{run_dir}/.hydra/config.yaml")
 
-is_dmc = cfg.env_name.startswith("dm_control/")
+is_dmc = cfg.env.id.startswith("dm_control/")
 
 # DMC environments with pixel observations dont work with render_mode="human"
 if not is_dmc:
-    cfg.env_kwargs.render_mode = "human"
+    if cfg.env.get("kwargs") is None:
+        cfg.env.kwargs = {}
+    cfg.env.kwargs.render_mode = "human"
 
-env = GymEnv(cfg.env_name, 1, seed=seed, wrappers=cfg.wrappers, **cfg.env_kwargs)
+env = make_env(cfg.env, seed=seed, scale_actions=True)
 
 # DMC envs with pixel obs dont use render_mode="human"
 # so a pygame screen is made manually instead
 if is_dmc:
     view_size = 480
-    camera_id = cfg.env_kwargs.get("render_kwargs", {}).get("camera_id", 0)
-    physics = env.env.envs[0].unwrapped._env.physics
+    camera_id = (cfg.env.get("kwargs") or {}).get("render_kwargs", {}).get("camera_id", 0)
+    physics = env.env.unwrapped._env.physics
     pygame.init()
     screen = pygame.display.set_mode((view_size * 2, view_size))
     pygame.display.set_caption("dreamer eval")
@@ -55,51 +69,47 @@ def show_dmc_frame(obs):
     clock.tick(30)
 
 
-is_discrete = isinstance(env.single_action_space, gym.spaces.Discrete)
-action_dim = env.single_action_space.n if is_discrete else env.single_action_space.shape[0]
+agent = DreamerV1Agent(cfg.algo, env.obs_space, env.action_space, device)
+world_model, actor = agent.world_model, agent.actor
+is_discrete, action_size = agent.is_discrete, agent.action_size
 
-latent_dim = cfg.latent_variables * cfg.latent_classes
+Checkpoint(run_dir, world_model=world_model, actor=actor).load(run_dir)
 
-world_model = WorldModel(env.state_dim, action_dim, cfg.latent_variables, cfg.latent_classes, cfg.hidden_dim, cfg.hidden_layer_size).to(device)
-actor = Actor(latent_dim, cfg.hidden_dim, action_dim, is_discrete, cfg.min_actor_stdev, cfg.init_actor_std, cfg.hidden_layer_size).to(device)
-
-checkpoint = torch.load(f"{run_dir}/network.pt", map_location=device, weights_only=False)
-
-world_model.load_state_dict(checkpoint["world_model"])
-actor.load_state_dict(checkpoint["actor"])
-
-states, _ = env.reset()
+states = np.stack([env.reset()])
 episode_done = False
-env_hidden_state = torch.zeros(1, cfg.hidden_dim).to(device)
-env_latent = torch.zeros(1, latent_dim).to(device)
-previous_action = torch.zeros(1, action_dim).to(device)
-epsilon = 0.05 
+episode_reward = 0.0
+env_hidden_state = torch.zeros(1, cfg.algo.rnn_size).to(device)
+env_latent = torch.zeros(1, cfg.algo.latent_dim).to(device)
+previous_action = torch.zeros(1, action_size).to(device)
+epsilon = 0.05
 
 while not episode_done:
 
     with torch.no_grad():
 
         env_hidden_state = world_model.rnn(torch.cat([env_latent, previous_action], dim=-1), env_hidden_state)
-        env_latent = world_model.posterior(torch.cat([env_hidden_state, world_model.encoder(preprocess(states, device))], dim=-1)).sample().flatten(-2)
+        env_latent = world_model.posterior(torch.cat([env_hidden_state, world_model.encoder(agent._preprocess(states))], dim=-1)).sample()
+
+        action_dist = actor(torch.cat([env_latent, env_hidden_state], dim=-1))
 
         if is_discrete:
             if np.random.rand() < epsilon:
-                action = torch.as_tensor(env.action_space.sample()).to(device)
+                action = torch.as_tensor([env.action_space.sample()]).to(device)
             else:
-                action = torch.argmax(actor(torch.cat([env_latent, env_hidden_state], dim=-1)).logits, dim=-1)
-            previous_action = torch.nn.functional.one_hot(action, num_classes=action_dim).float() 
+                action = torch.argmax(action_dist.logits, dim=-1)
+            previous_action = torch.nn.functional.one_hot(action, num_classes=action_size).float()
         else:
-            action_dist = actor(torch.cat([env_latent, env_hidden_state], dim=-1))
-            action = (action_dist.mean).clamp(-1, 1) 
+            action = agent._get_tanh_dist_mode(action_dist).clamp(-1, 1)
             previous_action = action
 
-    action_to_send = action.cpu().numpy() if is_discrete else scale_action(action.cpu().numpy(), env.single_action_space)
-    sprimes, rewards, is_terms, is_truncs, info = env.step(action_to_send)
+    # the env rescales [-1, 1] actions itself
+    outcome = env.step(action.cpu().numpy()[0])
+    episode_reward += outcome["reward"]
+    episode_done = outcome["done"]
+
+    states = np.stack([outcome["next_state"]])
 
     if is_dmc:
-        show_dmc_frame(sprimes)
+        show_dmc_frame(states)
 
-    if "episode" in info:
-        episode_done = True
-
-    states = env.reset_finished_envs(sprimes, is_terms, is_truncs)
+print(f"episode completed, reward {episode_reward}")

@@ -6,3 +6,6 @@ kwargs: {}
 wrappers:
   resize: {shape: [64,64]}
   channel_first:
+
+  # greyscale: {keep_dim: False}
+  # frame_stack: {stack_size: 4}
