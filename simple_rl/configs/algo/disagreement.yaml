@@ -4,7 +4,7 @@ num_envs: 1
 total_timesteps: 100_000
 train_every: 5 
 gradient_updates: 1
-log_every: 500 # timesteps between log writes (metrics are averaged over each interval)
+log_every: 5 # timesteps between log writes (metrics are averaged over each interval)
 
 save_checkpoints: false 
 
