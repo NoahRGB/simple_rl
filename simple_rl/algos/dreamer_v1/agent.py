@@ -1,6 +1,7 @@
 # NoahRGB 11/2026
 #
-#
+# contains the logic for the dreamer v1 agent
+# gradient updates, policy, etc.
 #
 #
 #

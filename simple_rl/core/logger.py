@@ -5,7 +5,7 @@
 #
 #
 
-import json
+import json, os 
 from pathlib import Path
 import numpy as np
 
@@ -76,6 +76,18 @@ class JSONOutput:
 
     def close(self):
         self.file.close()
+
+class TensorboardOutput:
+    def __init__(self, run_dir):
+        from torch.utils.tensorboard import SummaryWriter
+        self.tb_writer = SummaryWriter(os.path.join(run_dir, "tensorboard"), flush_secs=1)
+
+    def __call__(self, step, metrics):
+        for key, value in sorted(metrics.items()):
+            self.tb_writer.add_scalar(key, value, step)
+
+    def close(self):
+        self.tb_writer.close()
 
 
 # create a global logger that is used everywhere

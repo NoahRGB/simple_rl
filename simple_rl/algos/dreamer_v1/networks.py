@@ -1,6 +1,7 @@
 # NoahRGB 11/2026
 #
-#
+# contains the world model, actor and critic classes
+# for the dreamerv1 agent
 #
 
 import torch

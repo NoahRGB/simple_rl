@@ -8,6 +8,7 @@ title: ???
 notes: ???
 seed: 0
 device: cpu 
+tensorboard: true
 
 save_every: 50_000 # timesteps between checkpoints (only used if the algorithm has save_checkpoints: true)
 load_dir: null # directory of a previous run to load a checkpoint from

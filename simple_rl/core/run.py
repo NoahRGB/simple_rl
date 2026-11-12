@@ -50,7 +50,11 @@ def start(cfg, run_dir):
     )
 
     seed(cfg.seed)
-    log.setup([log.JSONOutput(run_dir)])
+
+    outputs = [log.JSONOutput(run_dir)]
+    if cfg.tensorboard: outputs.append(log.TensorboardOutput(run_dir))
+    log.setup(outputs)
+
     timer.reset()
 
     train = importlib.import_module(f"simple_rl.algos.{cfg.algo.name}.train").train
