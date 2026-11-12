@@ -60,7 +60,7 @@ class Logger:
                 output.close()
         self.setup()
 
-class TerminalOuptut:
+class TerminalOutput:
     def __call__(self, step, metrics):
         for key, value in sorted(metrics.items()):
             print(f"[{step}] {key}: {round(value, 2)}")

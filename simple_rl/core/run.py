@@ -14,6 +14,7 @@ import torch
 import numpy as np
 
 from simple_rl.core import logger as log
+from simple_rl.core.timer import timer
 
 
 @dataclass
@@ -21,6 +22,7 @@ class Run:
     # this is what the algorithms get given
     cfg: object
     dir: Path
+    device: torch.device
 
 def now():
     return datetime.now().isoformat(timespec="seconds")
@@ -48,14 +50,15 @@ def start(cfg, run_dir):
     )
 
     seed(cfg.seed)
-    log.setup([])
+    log.setup([log.JSONOutput(run_dir)])
+    timer.reset()
 
     train = importlib.import_module(f"simple_rl.algos.{cfg.algo.name}.train").train
-    write_status(run_dir, status="running", started=now())
+    write_status(run_dir, status="running", started=now(), device=str(cfg.device))
     start_time = time.time()
 
     try:
-        train(cfg, Run(cfg=cfg, dir=run_dir))
+        train(cfg, Run(cfg=cfg, dir=run_dir, device=cfg.device))
     except KeyboardInterrupt:
         write_status(run_dir, status="interrupted", duration_s=round(time.time() - start_time))
         raise

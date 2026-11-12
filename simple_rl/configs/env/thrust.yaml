@@ -1,0 +1,8 @@
+type: gym
+id: "ThrustEnv"
+
+kwargs: {}
+
+wrappers:
+  resize: {shape: [64,64]}
+  channel_first:

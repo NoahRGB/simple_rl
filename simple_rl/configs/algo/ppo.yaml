@@ -1,17 +1,19 @@
 name: ppo
 
-num_envs: 8
+num_envs: 4
 lr: 0.001
 timesteps: 1_000_000
-rollout_len: 32
-epochs: 20 
-minibatch_size: 256 
-gamma: 0.98
-lam: 0.8
+rollout_len: 1024 
+epochs: 10 
+minibatch_size: 64 
+gamma: 0.9
+lam: 0.95
 epsilon: 0.2
 entropy_weight: 0.0
 value_weight: 0.5 
 cgn: 0.5
+
+save_checkpoints: false # save checkpoint.pt every save_every timesteps and at the end of training
 
 architecture:
   actor_enc:

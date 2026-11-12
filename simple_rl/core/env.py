@@ -8,17 +8,21 @@ from abc import ABC, abstractmethod
 import numpy as np
 import gymnasium as gym
 
+def make_env(env_cfg, seed=None, **overrides):
+    # convert the env type in cfg.env into the corresponding env class
 
-# transitions are stored as:
-# (s_t, r_t, is_first, is_last, is_terminal, a_t)
-#
-# r_t is the reward for landing in s_t
-# a_t is the action chosen to apply in s_t
-# is_first determines if this is the first transition of the episode
-# is_last determines if the episode ended
-# is_terminal determines if the episode terminated (instead of truncated)
-#
+    # env_cfg is cfg.env; overrides are options the algorithm sets, e.g. scale_actions=True
+    kwargs = {**(env_cfg.get("kwargs") or {}), **overrides}
 
+    if env_cfg.type == "gym":
+        from simple_rl.envs.gym import GymEnv
+        return GymEnv(env_cfg.id, seed=seed, wrappers=env_cfg.get("wrappers"), **kwargs)
+
+    # if env_cfg.type == "gridworld":
+    #     from simple_rl.envs.gridworld import GridWorld
+    #     return GridWorld(seed=seed, **kwargs)
+
+    raise ValueError(f"unknown env type {env_cfg.type}")
 
 
 class Env(ABC):
@@ -28,11 +32,11 @@ class Env(ABC):
         self.action_space = action_space
 
     @abstractmethod
-    def reset(self) -> dict:
+    def reset(self):
         ...
 
     @abstractmethod
-    def step(self, action) -> dict:
+    def step(self, action):
         ...
 
 
@@ -49,10 +53,10 @@ class VecEnv:
         self.obs_space = self.envs[0].obs_space
         self.action_space = self.envs[0].action_space
 
-    def reset(self) -> dict:
+    def reset(self):
         return np.stack([env.reset() for env in self.envs])
 
-    def step(self, actions) -> dict:
+    def step(self, actions):
         outcomes, new_states = [], []
         # outcomes will store (next_state, reward, done, is_term)
         # new_state will store the true next state, which may involve resetting the env
@@ -64,14 +68,3 @@ class VecEnv:
 
         outcome = {key: np.stack([o[key] for o in outcomes]) for key in outcomes[0]}
         return outcome, np.stack(new_states)
-
-
-def get_action_size(space) -> tuple:
-
-    if isinstance(space, gym.spaces.Discrete):
-        return (space.n,)
-
-    if isinstance(space, gym.spaces.Box):
-        return (space.shape[0],)
-
-    raise ValueError(f"unsupported action space {space}")

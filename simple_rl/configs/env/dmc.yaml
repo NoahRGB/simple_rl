@@ -1,0 +1,15 @@
+type: gym
+id: "dm_control/cartpole-balance-v0"        
+
+kwargs:
+  render_mode: "rgb_array"
+  render_kwargs:
+    width: 64
+    height: 64
+    camera_id: 0
+        
+
+wrappers:
+  render_observation:
+  action_repeat: {repeat: 2}
+  channel_first:

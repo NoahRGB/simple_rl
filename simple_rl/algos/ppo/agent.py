@@ -13,15 +13,16 @@ from simple_rl.algos.ppo.networks import ActorCriticNetwork
 
 class PPOAgent:
 
-    def __init__(self, cfg, obs_space, action_space):
+    def __init__(self, cfg, obs_space, action_space, device):
+        self.device = device
         self.cfg = cfg # configs/algo/ppo.yaml
-        self.network = ActorCriticNetwork(cfg.architecture, obs_space.shape, action_space)
+        self.network = ActorCriticNetwork(cfg.architecture, obs_space.shape, action_space).to(device)
         self.optim = torch.optim.Adam(self.network.parameters(), lr=cfg.lr)
 
-    def policy(self, states):
+    def policy(self, states, is_first=None):
         # return action/log probs given a batch of states (num_envs, *state_dim)
         with torch.no_grad():
-            action_dist = self.network.get_actor(torch.as_tensor(states).float())
+            action_dist = self.network.get_actor(torch.as_tensor(states).to(self.device).float())
             actions = action_dist.sample()
             log_probs = action_dist.log_prob(actions)
 
@@ -31,10 +32,10 @@ class PPOAgent:
         cfg = self.cfg
         T, N = buffer.rollout_len, buffer.num_envs
 
-        states = buffer.states_buffer.float()
-        next_states = buffer.next_states_buffer.float()
-        actions, rewards, log_probs = buffer.actions_buffer, buffer.rewards_buffer, buffer.logprobs_buffer
-        is_terms, dones = buffer.is_terms_buffer, buffer.dones_buffer
+        states = buffer.states_buffer.float().to(self.device)
+        next_states = buffer.next_states_buffer.float().to(self.device)
+        actions, rewards, log_probs = buffer.actions_buffer.to(self.device), buffer.rewards_buffer.to(self.device), buffer.logprobs_buffer.to(self.device)
+        is_terms, dones = buffer.is_terms_buffer.to(self.device), buffer.dones_buffer.to(self.device)
 
         with torch.no_grad():
             # get state values across the rollout

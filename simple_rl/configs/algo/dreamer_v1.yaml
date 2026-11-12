@@ -1,0 +1,35 @@
+name: dreamer_v1
+num_envs: 1
+
+total_timesteps: 100_000
+train_every: 5 
+gradient_updates: 1
+log_every: 1000 # timesteps between log writes (metrics are averaged over each interval)
+
+save_checkpoints: true 
+
+replay_size: 500_000
+warmup_episodes: 5
+batch_size: 50 
+sequence_length: 50
+recon_std: 1.0
+min_actor_stdev: 1e-4
+imagination_horizon: 15
+lam: 0.95
+gamma: 0.99
+continuous_action_noise_stdev: 0.3
+cgn: 100.0
+
+world_model_lr: 0.0006
+value_model_lr: 0.00008
+action_model_lr: 0.00008
+
+epsilon_start: 0.4 
+epsilon_end: 0.1
+epsilon_decay_grad_steps: 200_000
+
+latent_dim: 30
+rnn_size: 200
+hidden_layer_size: 300
+kl_beta: 1.0 
+kl_free_nats: 3

@@ -21,7 +21,6 @@ class RolloutBuffer:
         else:
             self.state_dtype = state_dtype
 
-        # allocated once. reset() only rewinds the timestep, since every slot gets overwritten
         self.states_buffer = torch.empty((self.rollout_len, self.num_envs, *self.state_dim), dtype=self.state_dtype)
         self.actions_buffer = torch.empty((self.rollout_len, self.num_envs, *self.action_dim), dtype=torch.float32)
         self.rewards_buffer = torch.empty((self.rollout_len, self.num_envs), dtype=torch.float32)
@@ -32,25 +31,19 @@ class RolloutBuffer:
 
         self.reset()
 
-    def add(self, transition, env_idx):
-        state, action, reward, next_state, is_term, done, log_prob = (
-            transition["state"], transition["action"], transition["reward"], 
-            transition["next_state"], transition["is_term"], transition["done"], 
-            transition["log_prob"] 
-        )
-
+    def add(self, transitions):
         t = self.current_timestep
-        self.states_buffer[t, env_idx] = torch.as_tensor(state)
-        self.actions_buffer[t, env_idx] = torch.as_tensor(action)
-        self.rewards_buffer[t, env_idx] = torch.as_tensor(reward)
-        self.next_states_buffer[t, env_idx] = torch.as_tensor(next_state)
-        self.is_terms_buffer[t, env_idx] = torch.as_tensor(is_term)
-        self.dones_buffer[t, env_idx] = torch.as_tensor(done)
-        self.logprobs_buffer[t, env_idx] = torch.as_tensor(log_prob)
+        assert t < self.rollout_len, "rollout buffer is full, call reset()"
 
-        # if at the last env then increment the timestep
-        if env_idx == self.num_envs - 1:
-            self.current_timestep += 1
+        self.states_buffer[t] = torch.as_tensor(transitions["state"])
+        self.actions_buffer[t] = torch.as_tensor(transitions["action"])
+        self.rewards_buffer[t] = torch.as_tensor(transitions["reward"])
+        self.next_states_buffer[t] = torch.as_tensor(transitions["next_state"])
+        self.is_terms_buffer[t] = torch.as_tensor(transitions["is_term"])
+        self.dones_buffer[t] = torch.as_tensor(transitions["done"])
+        self.logprobs_buffer[t] = torch.as_tensor(transitions["log_prob"])
+
+        self.current_timestep += 1
 
     def reset(self):
         self.current_timestep = 0

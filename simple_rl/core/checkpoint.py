@@ -55,7 +55,7 @@ class Checkpoint:
             self.last_save = step
 
     def load(self, load_dir):
-        state = torch.load(Path(load_dir) / FILENAME, weights_only=True)
+        state = torch.load(Path(load_dir) / FILENAME, weights_only=True, map_location="cpu")
         for name, obj in self.objects.items():
             obj.load_state_dict(state[name])
 
