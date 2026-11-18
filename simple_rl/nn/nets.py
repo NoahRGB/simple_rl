@@ -12,6 +12,16 @@ import gymnasium as gym
 ACTIVATION_FUNCTIONS = {"relu": nn.ReLU, "tanh": nn.Tanh, "elu": nn.ELU}
 
 
+class Scale(nn.Module):
+    # divides the input by a constant, e.g. {type: scale, by: 255.0} for pixels
+    def __init__(self, by):
+        super().__init__()
+        self.by = float(by)
+
+    def forward(self, x):
+        return x / self.by
+
+
 def build_net(architecture, input_shape):
     layers, x = [], torch.zeros(1, *input_shape)
 
@@ -27,6 +37,8 @@ def build_net(architecture, input_shape):
             mod = nn.Flatten()
         elif kind == "layernorm":
             mod = nn.LayerNorm(x.shape[-1])
+        elif kind == "scale":
+            mod = Scale(layer["by"])
         else:
             raise ValueError(f"unknown layer type {kind}")
 

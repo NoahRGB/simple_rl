@@ -16,9 +16,18 @@ cgn: 0.5
 save_checkpoints: false # save checkpoint.pt every save_every timesteps and at the end of training
 
 architecture:
-  actor_enc:
-    - {type: linear, out: 64, act: tanh}
-    - {type: linear, out: 64, act: tanh}
-  value_enc:
-    - {type: linear, out: 64, act: tanh}
-    - {type: linear, out: 64, act: tanh}
+
+  shared_enc:
+    - {type: scale, by: 255.0}
+    - {type: conv, out: 16, kernel: 8, stride: 4, act: relu}
+    - {type: conv, out: 32, kernel: 4, stride: 2, act: relu}
+    - {type: flatten}
+    - {type: linear, out: 256, act: relu}
+
+  # actor_enc:
+  #   - {type: linear, out: 64, act: tanh}
+  #   - {type: linear, out: 64, act: tanh}
+
+  # value_enc:
+  #   - {type: linear, out: 64, act: tanh}
+  #   - {type: linear, out: 64, act: tanh}

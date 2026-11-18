@@ -10,11 +10,10 @@ kwargs:
   exploring_starts: False 
   reverse_gravity: False 
   display_scale: 1
-  action_space: "continuous"
+  action_space: "discrete"
 
 wrappers:
+  greyscale: {keep_dim: False}
   resize: {shape: [64,64]}
-  channel_first:
-
-  # greyscale: {keep_dim: False}
-  # frame_stack: {stack_size: 4}
+  # channel_first:
+  frame_stack: {stack_size: 4}
