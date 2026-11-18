@@ -7,7 +7,7 @@ defaults:
 title: ???
 notes: ???
 seed: 0
-device: cpu 
+device: cuda 
 tensorboard: true
 
 save_every: 1000 # timesteps between checkpoints (only used if the algorithm has save_checkpoints: true)

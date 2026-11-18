@@ -32,17 +32,18 @@ def train(cfg, run):
     running_intrinsic_returns = np.zeros(cfg.algo.num_envs)
 
     def ppo_add(transitions):
+
         nonlocal running_intrinsic_returns
+
+        intr = agent.get_intrinsic_reward(transitions["next_state"])
+        transitions["reward"] = np.array([intr], dtype=np.float32)
+
         running_intrinsic_returns = running_intrinsic_returns * cfg.algo.gamma + transitions["reward"] 
         intrinsic_normaliser.add_batch(running_intrinsic_returns)
         ppo_buffer.add(transitions)
 
     def on_ep(ep, env_idx):
         dynamics_buffer.add(ep["state"], ep["action"], ep["reward"], ep["next_state"], ep["is_term"])
-
-    def on_step(transition, env_idx):
-        intr = agent.get_intrinsic_reward(transition["next_state"])
-        transition["reward"] = intr
 
     checkpoint = Checkpoint(run.dir, every=cfg.save_every, world_model=agent.world_model, world_model_optim=agent.world_model_optim)
 
@@ -59,7 +60,6 @@ def train(cfg, run):
     timer.reset() # dont time the warmup
 
     if cfg.algo.learn_ppo: driver.on_batch(ppo_add)
-    driver.on_step(on_step)
 
     last_log = driver.total_steps
 

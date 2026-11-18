@@ -46,7 +46,7 @@ class InverseAgent:
         c = 0.001
         epsil = 0.001
         xi = 0.008
-        similarity_max = 100.0
+        similarity_max = 8.0 
     
         with torch.no_grad():
             embedded_state = self.world_model.encoder(torch.from_numpy(state).float().to(self.device))
@@ -56,7 +56,9 @@ class InverseAgent:
         self.running_dist_total += knn_d2.sum(-1).item()
         self.running_dist_count += knn_d2.numel() 
 
-        knn_d2 /= (self.running_dist_total / self.running_dist_count) 
+        mean_d2 = self.running_dist_total / self.running_dist_count
+        # eps avoids 0/0 when every distance so far is 0 (e.g. a wall bump leaves the obs unchanged)
+        knn_d2 = knn_d2 / (mean_d2 + 1e-8)
 
         knn_d2 = torch.clamp(knn_d2 - xi, min=0.0)
         kernel = epsil / (knn_d2 + epsil)
@@ -68,6 +70,10 @@ class InverseAgent:
 
     def policy(self, states, is_first):
         num_envs = states.shape[0]
+
+        if is_first[0]:
+            # history is episodic so reset at start of episode
+            self.history = []
 
         if self.hidden_state is None:
             self.hidden_state = torch.zeros(num_envs, self.cfg.rnn_size, device=self.device)
@@ -179,7 +185,6 @@ class InverseAgent:
         actions, rewards, log_probs = buffer.actions_buffer.to(self.device), buffer.rewards_buffer.to(self.device), buffer.logprobs_buffer.to(self.device)
         is_terms, dones = buffer.is_terms_buffer.to(self.device), buffer.dones_buffer.to(self.device)
 
-        print(rewards[0])
         rewards = torch.from_numpy(intrinsic_normaliser.normalise(rewards.cpu().numpy())).float().to(self.device)
 
         with torch.no_grad():
