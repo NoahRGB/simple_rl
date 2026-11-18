@@ -22,6 +22,7 @@ from simple_rl.core.normaliser import Normaliser
 def train(cfg, run):
     env = VecEnv([lambda i=i: make_env(cfg.env, seed=cfg.seed + i, scale_actions=True) for i in range(cfg.algo.num_envs)])
     driver = Driver(env)
+    assert cfg.algo.num_envs == 1, "only works with 1 env running"
 
     agent = InverseAgent(cfg.algo, env.obs_space, env.action_space, run.device)
     dynamics_buffer = EpisodicReplayMemory(cfg.algo.replay_size, env.obs_space.shape, env.action_space.shape, env.obs_space.dtype, cfg.algo.sequence_length)
@@ -31,10 +32,17 @@ def train(cfg, run):
     running_intrinsic_returns = np.zeros(cfg.algo.num_envs)
 
     def ppo_add(transitions):
-        nonlocal running_intrinsic_returns # reassigned below, so without this python treats it as a new local
-        running_intrinsic_returns =running_intrinsic_returns * cfg.algo.gamma + transitions["reward"] 
+        nonlocal running_intrinsic_returns
+        running_intrinsic_returns = running_intrinsic_returns * cfg.algo.gamma + transitions["reward"] 
         intrinsic_normaliser.add_batch(running_intrinsic_returns)
         ppo_buffer.add(transitions)
+
+    def on_ep(ep, env_idx):
+        dynamics_buffer.add(ep["state"], ep["action"], ep["reward"], ep["next_state"], ep["is_term"])
+
+    def on_step(transition, env_idx):
+        intr = agent.get_intrinsic_reward(transition["next_state"])
+        transition["reward"] = intr
 
     checkpoint = Checkpoint(run.dir, every=cfg.save_every, world_model=agent.world_model, world_model_optim=agent.world_model_optim)
 
@@ -43,8 +51,7 @@ def train(cfg, run):
 
     driver.on_episode(driver.log_episode)
 
-    if cfg.algo.learn_wm:
-        driver.on_episode(lambda ep, env_idx: dynamics_buffer.add(ep["state"], ep["action"], ep["reward"], ep["next_state"], ep["is_term"]))
+    driver.on_episode(on_ep)
 
     # execute S random warmup episodes to initialise DYNAMICS dataset
     random_policy = lambda states, is_first: {"action": np.stack([env.action_space.sample() for _ in range(env.num_envs)])}
@@ -52,6 +59,7 @@ def train(cfg, run):
     timer.reset() # dont time the warmup
 
     if cfg.algo.learn_ppo: driver.on_batch(ppo_add)
+    driver.on_step(on_step)
 
     last_log = driver.total_steps
 

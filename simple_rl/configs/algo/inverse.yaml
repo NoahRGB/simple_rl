@@ -19,7 +19,7 @@ cgn: 100.0
 
 world_model_lr: 0.0006
 ppo_lr: 0.0003
-learn_wm: false 
+learn_wm: true 
 learn_ppo: true 
 
 # ppo args

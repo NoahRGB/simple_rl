@@ -21,18 +21,80 @@ class InverseAgent:
         self.ppo_net = ActorCriticNetwork(cfg.architecture, obs_space.shape, action_space).to(device)
         self.ppo_net_optim = torch.optim.Adam(self.ppo_net.parameters(), lr=cfg.ppo_lr)
 
-    def policy(self, states, is_first):
 
-        if self.cfg.learn_ppo:
-            # return action/log probs given a batch of states (num_envs, *state_dim)
-            with torch.no_grad():
+        self.hidden_state, self.latent, self.previous_action = None, None, None
+        self.history = []
+        
+        self.running_dist_total = 0.0
+        self.running_dist_count = 0
+
+    def _get_knn(self, state, k):
+        with torch.no_grad():
+            history = torch.stack(self.history)
+
+            d2 = ((history - state)**2).sum(-1)
+
+            knn_d2, idx = torch.topk(d2, k=min(k, len(d2)), largest=False)
+            knn_states = history[idx]
+
+            return knn_states, knn_d2
+
+
+    def get_intrinsic_reward(self, state):
+        if len(self.history) == 0: return 0 
+        K = 5
+        c = 0.001
+        epsil = 0.001
+        xi = 0.008
+        similarity_max = 100.0
+    
+        with torch.no_grad():
+            embedded_state = self.world_model.encoder(torch.from_numpy(state).float().to(self.device))
+
+        knn_states, knn_d2 = self._get_knn(embedded_state, K)
+
+        self.running_dist_total += knn_d2.sum(-1).item()
+        self.running_dist_count += knn_d2.numel() 
+
+        knn_d2 /= (self.running_dist_total / self.running_dist_count) 
+
+        knn_d2 = torch.clamp(knn_d2 - xi, min=0.0)
+        kernel = epsil / (knn_d2 + epsil)
+
+        similarity = torch.sqrt(kernel.sum(-1)) + c
+
+        return 0.0 if similarity > similarity_max else (1 / similarity).item()
+
+
+    def policy(self, states, is_first):
+        num_envs = states.shape[0]
+
+        if self.hidden_state is None:
+            self.hidden_state = torch.zeros(num_envs, self.cfg.rnn_size, device=self.device)
+            self.latent = torch.zeros(num_envs, self.cfg.latent_dim, device=self.device)
+            self.previous_action = torch.zeros(num_envs, self.action_size, device=self.device)
+
+        with torch.no_grad():
+            # zero the running state of every env that just started a new episode
+            keep = 1.0 - torch.as_tensor(is_first, dtype=torch.float32, device=self.device).unsqueeze(-1)
+            self.hidden_state = self.hidden_state * keep
+            self.latent = self.latent * keep
+            self.previous_action = self.previous_action * keep
+
+            encoded = self.world_model.encoder(torch.from_numpy(states).float().to(self.device))
+            self.history.append(encoded[0])
+            self.hidden_state = self.world_model.rnn(torch.cat([self.latent, self.previous_action], dim=-1), self.hidden_state)
+            self.latent = self.world_model.posterior(torch.cat([self.hidden_state, encoded], dim=-1)).sample().flatten(-2)
+
+            if self.cfg.learn_ppo:
+                # return action/log probs given a batch of states (num_envs, *state_dim)
                 action_dist = self.ppo_net.get_actor(torch.as_tensor(states).to(self.device).float())
                 actions = action_dist.sample()
                 log_probs = action_dist.log_prob(actions)
 
-            return {"action": actions.cpu().numpy(), "log_prob": log_probs.cpu().numpy()}
+                return {"action": actions.cpu().numpy(), "log_prob": log_probs.cpu().numpy()}
 
-        return {"action": np.stack([self.action_space.sample() for _ in range(states.shape[0])])}
+            return {"action": np.stack([self.action_space.sample() for _ in range(states.shape[0])])}
 
     def dynamics_update(self, buffer):
 
@@ -84,7 +146,12 @@ class InverseAgent:
             recons = torch.distributions.OneHotCategorical(logits=recon_logits)
             recon_loss = -recons.log_prob(batch_next_states.flatten(0, 1)).mean()
 
-            world_model_loss = recon_loss + self.cfg.kl_beta * kl_loss
+            encoded_states = self.world_model.encoder(batch_states.flatten(0, 1))
+            inverse_inp = torch.cat([encoded_states, encoded.flatten(0, 1)], dim=-1)
+            inverse_logits = self.world_model.inverse_head(inverse_inp)
+            inverse_loss = torch.nn.functional.cross_entropy(inverse_logits, batch_actions.flatten(0, 1).argmax(-1))
+
+            world_model_loss = recon_loss + self.cfg.kl_beta * kl_loss + inverse_loss
                 
             self.world_model_optim.zero_grad()
             world_model_loss.backward()
@@ -112,6 +179,7 @@ class InverseAgent:
         actions, rewards, log_probs = buffer.actions_buffer.to(self.device), buffer.rewards_buffer.to(self.device), buffer.logprobs_buffer.to(self.device)
         is_terms, dones = buffer.is_terms_buffer.to(self.device), buffer.dones_buffer.to(self.device)
 
+        print(rewards[0])
         rewards = torch.from_numpy(intrinsic_normaliser.normalise(rewards.cpu().numpy())).float().to(self.device)
 
         with torch.no_grad():
