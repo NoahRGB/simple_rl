@@ -1,0 +1,4 @@
+name: random
+num_envs: 1
+
+total_timesteps: 10_000

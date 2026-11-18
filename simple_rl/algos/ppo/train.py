@@ -53,3 +53,6 @@ def train(cfg, run):
 
     if cfg.algo.save_checkpoints:
         checkpoint.save()
+
+    # returned so callers (e.g. experiment scripts) can inspect them after training
+    return agent, env

@@ -24,9 +24,13 @@ class ActionRepeat(gym.Wrapper):
         return obs, total_reward, terminated, truncated, info
 
 class ChannelFirst(gym.ObservationWrapper):
+    # HWC -> CHW; non-image (non-3D) observations are passed through unchanged
     def __init__(self, env):
         super().__init__(env)
         old = env.observation_space
+        self.is_image = len(old.shape) == 3
+        if not self.is_image:
+            return
         self.observation_space = gym.spaces.Box(
             low=np.transpose(old.low, (2, 0, 1)),
             high=np.transpose(old.high, (2, 0, 1)),
@@ -34,6 +38,8 @@ class ChannelFirst(gym.ObservationWrapper):
         )
 
     def observation(self, obs):
+        if not self.is_image:
+            return obs
         return np.transpose(obs, (2, 0, 1))
 
 def remove_reward(env):

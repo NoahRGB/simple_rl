@@ -62,7 +62,8 @@ def start(cfg, run_dir):
     start_time = time.time()
 
     try:
-        train(cfg, Run(cfg=cfg, dir=run_dir, device=cfg.device))
+        # train() returns (agent, env) so the caller can inspect them after training
+        result = train(cfg, Run(cfg=cfg, dir=run_dir, device=cfg.device))
     except KeyboardInterrupt:
         write_status(run_dir, status="interrupted", duration_s=round(time.time() - start_time))
         raise
@@ -73,3 +74,4 @@ def start(cfg, run_dir):
         log.close()
 
     write_status(run_dir, status="finished", duration_s=round(time.time() - start_time))
+    return result

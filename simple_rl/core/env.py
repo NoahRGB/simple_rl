@@ -39,6 +39,12 @@ class Env(ABC):
     def step(self, action):
         ...
 
+    @property
+    def unwrapped(self):
+        # the innermost environment object, e.g. the GridWorld inside a GymEnv
+        # subclasses that wrap another env should override this
+        return self
+
 
 class VecEnv:
     # a class that allows multiple Env classes to be created and 
@@ -52,6 +58,11 @@ class VecEnv:
         self.num_envs = len(self.envs)
         self.obs_space = self.envs[0].obs_space
         self.action_space = self.envs[0].action_space
+
+    @property
+    def unwrapped(self):
+        # the innermost environment of every subenv, e.g. env.unwrapped[0] is the first GridWorld
+        return [env.unwrapped for env in self.envs]
 
     def reset(self):
         return np.stack([env.reset() for env in self.envs])

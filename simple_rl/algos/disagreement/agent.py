@@ -104,7 +104,7 @@ class DisagreementAgent:
 
     def update(self, buffer):
         metric_names = ["world_model_loss", "reconstruction_loss", "reconstruction_mse", "kl", "kl_loss", "reward_loss",
-                        "prior_std", "posterior_std", "actor_loss", "value_model_loss", "discount_loss"]
+                        "prior_std", "posterior_std", "discount_loss"]
         metrics = {name: [] for name in metric_names}
 
         for update_step in range(self.cfg.gradient_updates):

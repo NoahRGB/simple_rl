@@ -1,6 +1,8 @@
 type: gym
 id: "MyGridWorld"
-kwargs: {}
+kwargs:
+  obs_mode: onehot # rgb | onehot
+  reward_mode: count # none | count (1/sqrt(lifelong visit count))
 
 wrappers:
-  channel_first:
+  channel_first: # no-op for onehot obs

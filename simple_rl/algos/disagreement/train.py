@@ -34,8 +34,9 @@ def train(cfg, run):
     env = VecEnv([lambda i=i: make_env(cfg.env, seed=cfg.seed + i, scale_actions=True) for i in range(cfg.algo.num_envs)])
     driver = Driver(env)
 
-    grid_width, grid_height = env.envs[0].env.unwrapped.width, env.envs[0].env.unwrapped.height
-    grid_walls = env.envs[0].env.unwrapped.walls
+    gridworld = env.unwrapped[0]
+    grid_width, grid_height = gridworld.width, gridworld.height
+    grid_walls = gridworld.walls
 
     agent = DisagreementAgent(cfg.algo, env.obs_space, env.action_space, run.device, grid_width, grid_height, grid_walls)
     buffer = EpisodicReplayMemory(cfg.algo.replay_size, env.obs_space.shape, env.action_space.shape, env.obs_space.dtype, cfg.algo.sequence_length)
@@ -91,3 +92,5 @@ def train(cfg, run):
     if cfg.algo.save_checkpoints:
         checkpoint.save(gradient_steps=agent.gradient_steps)
 
+    # returned so callers (e.g. experiment scripts) can inspect them after training
+    return agent, env

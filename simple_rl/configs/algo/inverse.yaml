@@ -1,0 +1,46 @@
+name: inverse 
+num_envs: 1
+
+total_timesteps: 100_000 
+train_every: 5 
+gradient_updates: 1
+log_every: 500 # timesteps between log writes (metrics are averaged over each interval)
+
+save_checkpoints: true 
+
+replay_size: 500_000
+prioritise_ends: true
+warmup_episodes: 5
+batch_size: 125 
+sequence_length: 20 
+lam: 0.95
+gamma: 0.99
+cgn: 100.0
+
+world_model_lr: 0.0006
+ppo_lr: 0.0003
+learn_wm: false 
+learn_ppo: true 
+
+# ppo args
+ppo_rollout_len: 512 
+epochs: 4 
+minibatch_size: 128 
+epsilon: 0.2
+entropy_weight: 0.01
+value_weight: 0.5 
+ppo_cgn: 0.5
+
+latent_dim: 30
+rnn_size: 200
+hidden_layer_size: 300
+kl_beta: 1.0 
+kl_free_nats: 3
+
+architecture:
+  actor_enc:
+    - {type: linear, out: 64, act: tanh}
+    - {type: linear, out: 64, act: tanh}
+  value_enc:
+    - {type: linear, out: 64, act: tanh}
+    - {type: linear, out: 64, act: tanh}

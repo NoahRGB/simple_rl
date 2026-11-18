@@ -56,6 +56,11 @@ class GymEnv(Env):
 
         super().__init__(self.env.observation_space, action_space)
 
+    @property
+    def unwrapped(self):
+        # the gymnasium env underneath all the wrappers
+        return self.env.unwrapped
+
     def reset(self):
         states, info = self.env.reset(seed=self.seed)
         self.seed = None # only seed the first reset

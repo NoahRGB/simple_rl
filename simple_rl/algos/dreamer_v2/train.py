@@ -72,3 +72,5 @@ def train(cfg, run):
     if cfg.algo.save_checkpoints:
         checkpoint.save(gradient_steps=agent.gradient_steps)
 
+    # returned so callers (e.g. experiment scripts) can inspect them after training
+    return agent, env

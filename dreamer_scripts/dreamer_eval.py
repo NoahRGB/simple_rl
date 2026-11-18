@@ -40,7 +40,7 @@ env = make_env(cfg.env, seed=seed, scale_actions=True)
 if is_dmc:
     view_size = 480
     camera_id = (cfg.env.get("kwargs") or {}).get("render_kwargs", {}).get("camera_id", 0)
-    physics = env.env.unwrapped._env.physics
+    physics = env.unwrapped._env.physics
     pygame.init()
     screen = pygame.display.set_mode((view_size * 2, view_size))
     pygame.display.set_caption("dreamer eval")
