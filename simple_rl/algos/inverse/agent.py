@@ -28,6 +28,11 @@ class InverseAgent:
         self.running_dist_total = 0.0
         self.running_dist_count = 0
 
+    def _preprocess(self, obs):
+        # convert to torch tensor and scale
+        tens = torch.as_tensor(obs, dtype=torch.float32).to(self.device)
+        return (tens / 255.0) - 0.5
+
     def _get_knn(self, state, k):
         with torch.no_grad():
             history = torch.stack(self.history)
@@ -77,7 +82,7 @@ class InverseAgent:
             a = torch.as_tensor(action).to(self.device)
             a = torch.nn.functional.one_hot(a.long(), self.action_size).float() if self.is_discrete else a.float()
 
-            encoded = self.world_model.encoder(torch.as_tensor(next_state).float().to(self.device))
+            encoded = self.world_model.encoder(self._preprocess(next_state))
             self.hidden_state = self.world_model.rnn(torch.cat([self.latent, a], dim=-1), self.hidden_state)
             posterior = self.world_model.posterior(torch.cat([self.hidden_state, encoded], dim=-1))
 
@@ -128,6 +133,7 @@ class InverseAgent:
             windows, sample_size = buffer.sample(self.cfg.batch_size, self.device, self.cfg.prioritise_ends)
             batch_states, batch_actions, batch_rewards, batch_next_states, batch_terms = windows # (B, L, ..., )
 
+            batch_next_states = self._preprocess(batch_next_states)
             if self.is_discrete:
                 batch_actions = torch.nn.functional.one_hot(batch_actions.long(), num_classes=self.action_size).float()
             else:
@@ -159,11 +165,15 @@ class InverseAgent:
 
             latent_hidden_features = torch.cat([latents, hidden_states], dim=-1) # (B, L, ...)
 
-            recon_logits = self.world_model.decoder(latent_hidden_features.flatten(0, 1))
-            recons = torch.distributions.OneHotCategorical(logits=recon_logits)
-            recon_loss = -recons.log_prob(batch_next_states.flatten(0, 1)).mean()
+            # recon_logits = self.world_model.decoder(latent_hidden_features.flatten(0, 1))
+            # recons = torch.distributions.OneHotCategorical(logits=recon_logits)
+            # recon_loss = -recons.log_prob(batch_next_states.flatten(0, 1)).mean()
 
-            encoded_states = self.world_model.encoder(batch_states.flatten(0, 1))
+            recon_mean = self.world_model.decoder(latent_hidden_features.flatten(0, 1))
+            recons = torch.distributions.Normal(recon_mean, self.cfg.recon_std)
+            recon_loss = -recons.log_prob(batch_next_states.flatten(0, 1)).sum((1, 2, 3)).mean()
+
+            encoded_states = self.world_model.encoder(self._preprocess(batch_states.flatten(0, 1)))
             inverse_inp = torch.cat([encoded_states, encoded.flatten(0, 1)], dim=-1)
             inverse_logits = self.world_model.inverse_head(inverse_inp)
             inverse_loss = torch.nn.functional.cross_entropy(inverse_logits, batch_actions.flatten(0, 1).argmax(-1))

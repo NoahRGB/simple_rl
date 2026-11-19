@@ -15,14 +15,31 @@ class DynamicsModel(torch.nn.Module):
         self.latent_dim = latent_dim
 
 
-        self.encoder_out = 32
+
+        # self.encoder = torch.nn.Sequential(
+        #     torch.nn.Linear(state_dim[0], 32),
+        #     torch.nn.ReLU(),
+        #     torch.nn.Linear(32, 32),
+        #     torch.nn.ReLU(),
+        # )
+        # self.encoder_out = 32
 
         self.encoder = torch.nn.Sequential(
-            torch.nn.Linear(state_dim[0], 32),
+            torch.nn.Conv2d(state_dim[0], 32, kernel_size=4, stride=2),
             torch.nn.ReLU(),
-            torch.nn.Linear(32, 32),
+            torch.nn.Conv2d(32, 64, kernel_size=4, stride=2),
             torch.nn.ReLU(),
+            torch.nn.Conv2d(64, 128, kernel_size=4, stride=2),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(128, 256, kernel_size=4, stride=2),
+            torch.nn.ReLU(),
+            torch.nn.Flatten(), # 1024
         )
+
+        with torch.no_grad():
+            self.encoder_out = self.encoder(torch.zeros(1, *state_dim)).shape[-1]
+
+
 
 
         self.posterior_net = torch.nn.Sequential(
@@ -43,10 +60,22 @@ class DynamicsModel(torch.nn.Module):
         self.prior_mu_head = torch.nn.Linear(hidden_size, self.latent_dim)
         self.prior_sigma_head = torch.nn.Linear(hidden_size, self.latent_dim)
 
+        # self.decoder = torch.nn.Sequential(
+        #     torch.nn.Linear(self.rnn_size+self.latent_dim, 32),
+        #     torch.nn.ReLU(),
+        #     torch.nn.Linear(32, state_dim[0]),
+        # )
+
         self.decoder = torch.nn.Sequential(
-            torch.nn.Linear(self.rnn_size+self.latent_dim, 32),
+            torch.nn.Linear(self.latent_dim+self.rnn_size, 1024),
+            torch.nn.Unflatten(-1, unflattened_size=(1024, 1, 1)),
+            torch.nn.ConvTranspose2d(in_channels=1024, out_channels=128, kernel_size=5, stride=2),
             torch.nn.ReLU(),
-            torch.nn.Linear(32, state_dim[0]),
+            torch.nn.ConvTranspose2d(in_channels=128, out_channels=64, kernel_size=5, stride=2),
+            torch.nn.ReLU(),
+            torch.nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=6, stride=2),
+            torch.nn.ReLU(),
+            torch.nn.ConvTranspose2d(in_channels=32, out_channels=3, kernel_size=6, stride=2),
         )
 
         self.inverse_head = torch.nn.Sequential(

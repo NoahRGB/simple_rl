@@ -103,11 +103,17 @@ PLAYER = np.array([200, 30, 30], dtype=np.uint8)
 
 
 class GridWorld(gym.Env):
-    metadata = {"render_modes": ["rgb_array"], "render_fps": 10}
+    metadata = {"render_modes": ["rgb_array", "human"], "render_fps": 10}
 
-    def __init__(self, layout=SIXTEEN_ROOMS, img_size=64, max_steps=500, render_mode="rgb_array", obs_mode="rgb", reward_mode="none"):
+    def __init__(self, layout=SIXTEEN_ROOMS, img_size=64, max_steps=500, render_mode="rgb_array", obs_mode="rgb", reward_mode="none", view_size=7, window_size=512):
         super().__init__()
-        assert obs_mode in ("rgb", "onehot"), f"unknown obs_mode {obs_mode}"
+        assert render_mode in self.metadata["render_modes"], f"unknown render_mode {render_mode}"
+        self.window_size = window_size # pixel size of the render_mode="human" window
+        self.window = None
+        self.clock = None
+        assert obs_mode in ("rgb", "onehot", "local_rgb"), f"unknown obs_mode {obs_mode}"
+        assert view_size % 2 == 1, "view_size must be odd so the player is centred"
+        self.view_size = view_size
         assert reward_mode in ("none", "count"), f"unknown reward_mode {reward_mode}"
         self.render_mode = render_mode
         self.obs_mode = obs_mode
@@ -127,7 +133,10 @@ class GridWorld(gym.Env):
         assert len(starts) == 1, "only one start pos (S) allowed"
         self.start = tuple(int(v) for v in starts[0])
 
-        if obs_mode == "rgb":
+        self.view_cell_px = self.img_size // view_size
+        assert self.view_cell_px >= 1, f"view_size {view_size} is too big for img_size {self.img_size}"
+
+        if obs_mode in ("rgb", "local_rgb"):
             self.observation_space = spaces.Box(
                 low=0, high=255, shape=(img_size, img_size, 3), dtype=np.uint8)
         else:
@@ -147,6 +156,8 @@ class GridWorld(gym.Env):
         self.pos = self.start
         self.t = 0
         obs = self.obs_at(self.pos)
+        if self.render_mode == "human":
+            self.render()
         return obs, self._info()
 
     def step(self, action):
@@ -160,16 +171,42 @@ class GridWorld(gym.Env):
         self.t += 1
 
         obs = self.obs_at(self.pos)
-        reward = 1 / np.sqrt(self.visit_counts[self.pos]) 
+
+        if self.reward_mode == "count":
+            reward = 1 / np.sqrt(self.visit_counts[self.pos]) 
+        else:
+            reward = 0.0
+
         terminated = False # never terminated
         truncated = self.t >= self.max_steps
+        if self.render_mode == "human":
+            self.render()
         return obs, reward, terminated, truncated, self._info()
 
     def render(self):
-        return self._render_obs(self.pos)
+        # what the agent sees (onehot obs isn't an image, so fall back to the full maze)
+        frame = self._render_obs(self.pos) if self.obs_mode == "onehot" else self.obs_at(self.pos)
+        if self.render_mode == "rgb_array":
+            return frame
+
+        import pygame
+        if self.window is None:
+            pygame.init()
+            pygame.display.set_caption(f"gridworld ({self.obs_mode})")
+            self.window = pygame.display.set_mode((self.window_size, self.window_size))
+            self.clock = pygame.time.Clock()
+        pygame.event.pump() # keep the window responsive
+        surface = pygame.surfarray.make_surface(frame.swapaxes(0, 1)) # (H, W, 3) -> (W, H, 3)
+        self.window.blit(pygame.transform.scale(surface, self.window.get_size()), (0, 0)) # nearest neighbour
+        pygame.display.flip()
+        self.clock.tick(self.metadata["render_fps"])
 
     def close(self):
-        pass
+        if self.window is not None:
+            import pygame
+            pygame.display.quit()
+            pygame.quit()
+            self.window = None
 
     def render_at(self, pos):
         return self._render_obs(pos)
@@ -178,7 +215,26 @@ class GridWorld(gym.Env):
         # the observation the agent would see at pos (depends on obs_mode)
         if self.obs_mode == "rgb":
             return self._render_obs(pos)
+        if self.obs_mode == "local_rgb":
+            return self._local_obs(pos)
         return self._onehot_obs(pos)
+
+    def _local_obs(self, pos):
+        # view_size x view_size cells centred on the player, cells outside the grid drawn as wall
+        r = self.view_size // 2
+        padded = np.pad(self.walls, r, constant_values=True)
+        row, col = pos
+        local_walls = padded[row : row + self.view_size, col : col + self.view_size]
+
+        small_img = np.where(local_walls[..., None], WALL, FLOOR)
+        small_img[r, r] = PLAYER
+        img = small_img.repeat(self.view_cell_px, axis=0).repeat(self.view_cell_px, axis=1)
+
+        # pad to (self.img_size, self.img_size), e.g. 7 cells * 9px = 63 -> 64
+        obs = np.empty((self.img_size, self.img_size, 3), dtype=np.uint8)
+        obs[:] = WALL
+        obs[:img.shape[0], :img.shape[1]] = img
+        return obs
 
     def _onehot_obs(self, pos):
         obs = np.zeros(self.height * self.width, dtype=np.float32)
@@ -230,6 +286,16 @@ if __name__ == "__main__":
     assert obs.shape == (env.height * env.width,) and obs.sum() == 1.0
     assert obs[env.start[0] * env.width + env.start[1]] == 1.0
     check_env(GridWorld(obs_mode="onehot"))
+
+    env = GridWorld(obs_mode="local_rgb")
+    obs, _ = env.reset(seed=0)
+    c = env.view_cell_px
+    assert obs.shape == (64, 64, 3)
+    assert (obs[3 * c, 3 * c] == PLAYER).all() # player in the centre cell
+    assert (obs[2 * c, 3 * c] == WALL).all() # wall above start
+    assert (obs[3 * c, 4 * c] == FLOOR).all() # floor right of start
+    assert (obs[0, 0] == WALL).all() # outside the grid drawn as wall
+    check_env(GridWorld(obs_mode="local_rgb"))
 
     env = GridWorld(reward_mode="count")
     env.reset(seed=0)
