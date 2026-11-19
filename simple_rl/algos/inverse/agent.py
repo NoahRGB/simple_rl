@@ -39,19 +39,24 @@ class InverseAgent:
 
             return knn_states, knn_d2
 
+    def get_intrinsic_reward(self, next_state, action):
+        embedded_state = self.observe(next_state, action)
 
-    def get_intrinsic_reward(self, state):
-        if len(self.history) == 0: return 0 
+        if len(self.history) == 0:
+            self.history.append(embedded_state)
+            return 0.0
+
         K = 5
         c = 0.001
         epsil = 0.001
         xi = 0.008
         similarity_max = 8.0 
     
-        with torch.no_grad():
-            embedded_state = self.world_model.encoder(torch.from_numpy(state).float().to(self.device))
+        # with torch.no_grad():
+        #     embedded_state = self.world_model.encoder(torch.from_numpy(state).float().to(self.device))
 
         knn_states, knn_d2 = self._get_knn(embedded_state, K)
+        self.history.append(embedded_state)
 
         self.running_dist_total += knn_d2.sum(-1).item()
         self.running_dist_count += knn_d2.numel() 
@@ -67,13 +72,20 @@ class InverseAgent:
 
         return 0.0 if similarity > similarity_max else (1 / similarity).item()
 
+    def observe(self, next_state, action):
+        with torch.no_grad():
+            a = torch.as_tensor(action).to(self.device)
+            a = torch.nn.functional.one_hot(a.long(), self.action_size).float() if self.is_discrete else a.float()
+
+            encoded = self.world_model.encoder(torch.as_tensor(next_state).float().to(self.device))
+            self.hidden_state = self.world_model.rnn(torch.cat([self.latent, a], dim=-1), self.hidden_state)
+            posterior = self.world_model.posterior(torch.cat([self.hidden_state, encoded], dim=-1))
+
+            self.latent = posterior.sample()
+            return posterior.mean[0]
 
     def policy(self, states, is_first):
         num_envs = states.shape[0]
-
-        if is_first[0]:
-            # history is episodic so reset at start of episode
-            self.history = []
 
         if self.hidden_state is None:
             self.hidden_state = torch.zeros(num_envs, self.cfg.rnn_size, device=self.device)
@@ -87,10 +99,9 @@ class InverseAgent:
             self.latent = self.latent * keep
             self.previous_action = self.previous_action * keep
 
-            encoded = self.world_model.encoder(torch.from_numpy(states).float().to(self.device))
-            self.history.append(encoded[0])
-            self.hidden_state = self.world_model.rnn(torch.cat([self.latent, self.previous_action], dim=-1), self.hidden_state)
-            self.latent = self.world_model.posterior(torch.cat([self.hidden_state, encoded], dim=-1)).sample().flatten(-2)
+            if is_first[0]:
+                # history is episodic so reset at start of episode
+                self.history = []
 
             if self.cfg.learn_ppo:
                 # return action/log probs given a batch of states (num_envs, *state_dim)

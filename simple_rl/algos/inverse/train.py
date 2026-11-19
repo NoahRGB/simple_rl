@@ -35,7 +35,7 @@ def train(cfg, run):
 
         nonlocal running_intrinsic_returns
 
-        intr = agent.get_intrinsic_reward(transitions["next_state"])
+        intr = agent.get_intrinsic_reward(transitions["next_state"], transitions["action"])
         transitions["reward"] = np.array([intr], dtype=np.float32)
 
         running_intrinsic_returns = running_intrinsic_returns * cfg.algo.gamma + transitions["reward"] 
