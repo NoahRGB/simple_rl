@@ -33,13 +33,13 @@ def train(cfg, run):
 
     def ppo_add(transitions):
 
-        nonlocal running_intrinsic_returns
+        # nonlocal running_intrinsic_returns
 
-        intr = agent.get_intrinsic_reward(transitions["next_state"], transitions["action"])
-        transitions["reward"] = np.array([intr], dtype=np.float32)
+        # intr = agent.get_intrinsic_reward(transitions["next_state"], transitions["action"])
+        # transitions["reward"] = np.array([intr], dtype=np.float32)
 
-        running_intrinsic_returns = running_intrinsic_returns * cfg.algo.gamma + transitions["reward"] 
-        intrinsic_normaliser.add_batch(running_intrinsic_returns)
+        # running_intrinsic_returns = running_intrinsic_returns * cfg.algo.gamma + transitions["reward"] 
+        # intrinsic_normaliser.add_batch(running_intrinsic_returns)
         ppo_buffer.add(transitions)
 
     def on_ep(ep, env_idx):

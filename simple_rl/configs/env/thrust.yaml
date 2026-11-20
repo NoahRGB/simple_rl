@@ -5,7 +5,7 @@ kwargs:
   obs_type: "screen_pixels" # game_state
   max_steps: 250 
   num_scanners: 0 
-  game_level: 1 
+  game_level: 2 
   aggro: 0
   exploring_starts: False 
   reverse_gravity: False 
@@ -14,6 +14,6 @@ kwargs:
 
 wrappers:
   greyscale: {keep_dim: False}
-  resize: {shape: [64,64]}
+  resize: {shape: [84,84]}
   # channel_first:
   frame_stack: {stack_size: 4}
